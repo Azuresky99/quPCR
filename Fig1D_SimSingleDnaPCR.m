@@ -4,7 +4,7 @@
 clear all, clc
 E = 1.959 - 1;
 threshold = (1+E)^38.34;
-nWell = 100000;	
+nWell = 1000000;	
 nInitDnaCopy = 1;
 nStageRound = 20;
 
@@ -19,16 +19,15 @@ for CopyRound = 1:length(nInitDnaCopy)
 	tic
 	wbar = waitbar(0,'第一阶段仿真...');	
 	for roundNum = 2:nStage1
-		for tt = 1:nWell	
-			n = nDNACopy(roundNum-1, tt);
+		prevRow = nDNACopy(roundNum-1, :);
+		parfor tt = 1:nWell	
+			n = prevRow(tt);
 			r = (rand(1, n) <= E);
 			p = r + 1;
 			n = sum(p);
 			nDNACopy(roundNum,tt) = n;
-			if mod(tt, 10000)==0
-				waitbar(((roundNum-2)*nWell+tt)/((nStage1-1)*nWell+3), wbar, sprintf('第一阶段仿真，第%g轮%g孔，...', roundNum, tt));
-			end
 		end
+		waitbar(((roundNum-2)*nWell)/((nStage1-1)*nWell), wbar, sprintf('第一阶段仿真，第%g轮，...', roundNum));
 	end
 	
 	if needPlotStage1
@@ -51,7 +50,7 @@ for CopyRound = 1:length(nInitDnaCopy)
 	
 	% 2nd Stage
 	wbar = waitbar(1, wbar, '第二阶段仿真...');		% waitbar show progress
-	for tt = 1:nWell
+	parfor tt = 1:nWell
 		Cq(tt) = log(threshold/nDNACopy(nStage1,tt)) / log(E+1) + nStage1 - 1;
 	end
 
@@ -59,7 +58,7 @@ for CopyRound = 1:length(nInitDnaCopy)
 	figure, hist(Cq, 1000)
 	[counts,centers] = hist(Cq, 1000); title(sprintf('%g拷贝, Cq值分布，总共%d个复孔', nInitDnaCopy(CopyRound), nWell));
 	[idx5, idx95] = find90(centers, counts);
-	slideWin = round((centers(idx95)-centers(idx5)) / 10 / (centers(2) - centers(1)));
+	slideWin = round(0.15 / (centers(2) - centers(1)));
 	slideWin = floor(slideWin/2) * 2 + 1;
 	nStart = ceil(slideWin / 2);
 	nEnd = length(centers) - floor(slideWin / 2);

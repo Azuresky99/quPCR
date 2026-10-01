@@ -8,7 +8,7 @@
 % 2025-12-28 18:37:18
 
 clear all; clc
-E = 1.9596 - 1;					% Amplify efficiency
+E = 1.9593 - 1;					% Amplify efficiency
 fx = 0.12;						% Cq threshold
 threshold = (1+E)^38.335;		% set the copy number while amplicons cross the Cq, and make the Peak of Cq profile equal to 38.21
 MR = fx / threshold;			% fluorescence efficiency
@@ -27,16 +27,17 @@ for CopyRound = 1:length(nInitDnaCopy)
 	tic
 	wbar = waitbar(0,'First stage...');
 	for roundNum = 2:nStage1
-		for tt = 1:nTube
-			n = nDNACopy(roundNum-1, tt);
+    	prevRow = nDNACopy(roundNum - 1, :);
+    	curRow = zeros(1, nTube);			
+		parfor tt = 1:nTube
+			n = prevRow(tt);
 			r = (rand(1, n) <= E);
 			p = r + 1;
 			n = sum(p);
-			nDNACopy(roundNum,tt) = n;
-			if mod(tt, 10000)==0
-				waitbar(((roundNum-2)*nTube+tt)/((nStage1-1)*nTube+3), wbar, sprintf('First stage, the %g round %g well，...', roundNum, tt));
-			end
+        	curRow(tt) = n;
 		end
+		nDNACopy(roundNum, :) = curRow;
+    	waitbar((roundNum - 1) / (nStage1 - 1), wbar, sprintf('First stage, the %g round，...', roundNum));
 	end
 	
 	% The second stage
@@ -46,8 +47,13 @@ for CopyRound = 1:length(nInitDnaCopy)
 	end
 
 	% plot
-	figure, hist(Cq, 1000)
-	[counts,centers] = hist(Cq, 1000); title(sprintf('%g copy, Cq value spread，%d wells in total', nInitDnaCopy(CopyRound), nTube));
+	figure, title(sprintf('%g copy, Cq value spread，%d wells in total', nInitDnaCopy(CopyRound), nTube));
+	h = histogram(Cq, 1000);
+	h.EdgeColor = 'none';
+	counts = h.Values;
+	edges = h.BinEdges;
+	centers = h.BinEdges(1:end-1) + h.BinWidth/2;
+	bar(centers, counts, 1);
 	% denoise by slide window
 	[idx5, idx95] = find90(centers, counts);
 	slideWin = round((centers(idx95)-centers(idx5)) / 10 / (centers(2) - centers(1)));
@@ -60,10 +66,10 @@ for CopyRound = 1:length(nInitDnaCopy)
 	for ii = nStart:nEnd
 		slideCounts(ii) = sum(counts((ii-halfWidth):(ii+halfWidth)) .* ntemplate);
 	end
-	figure, bar(centers, counts), hold on, plot(centers, slideCounts, 'r'), title([num2str(nInitDnaCopy(CopyRound)), 'Copy, Cq value spread + Cq value after sliding filter']), legend("Cq", "smooth Cq")
+	figure, bar(centers, counts, 1), hold on, plot(centers, slideCounts, 'r'), title([num2str(nInitDnaCopy(CopyRound)), 'Copy, Cq value spread + Cq value after sliding filter']), legend("Cq", "smooth Cq")
 	figureFileName = [num2str(nInitDnaCopy(CopyRound)), 'Copy.fig'];
 	savefig(figureFileName);
-	figure, bar(centers, slideCounts), title([num2str(nInitDnaCopy(CopyRound)), 'Copy, Cq value spread after sliding filter'])
+	figure, bar(centers, slideCounts, 1), title([num2str(nInitDnaCopy(CopyRound)), 'Copy, Cq value spread after sliding filter'])
 	% set high precision cursor
 	dcmObj = datacursormode;% Turn on data cursors and return the
 							%   data cursor mode object
